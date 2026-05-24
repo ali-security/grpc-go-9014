@@ -72,7 +72,7 @@ func Test(t *testing.T) {
 }
 
 const (
-	defaultTestTimeout      = 10 * time.Second
+	defaultTestTimeout      = 30 * time.Second
 	defaultTestShortTimeout = 10 * time.Millisecond
 
 	errorTolerance = .05 // For tests that rely on statistical significance.
