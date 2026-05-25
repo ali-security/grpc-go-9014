@@ -81,6 +81,29 @@ type traceSpanInfo struct {
 	attributes []attribute.KeyValue
 }
 
+// reorderSpansToMatchWantSI returns spans reordered so that spans[i] has the
+// same name and spanKind as wantSI[i]. Each wantSI entry must have a unique
+// (name, spanKind) tuple. The OTel in-memory exporter returns spans in
+// finish-order, which is non-deterministic under slow runtimes (e.g. qemu
+// emulation); ordering by (name, spanKind) keeps the comparison stable.
+func reorderSpansToMatchWantSI(spans tracetest.SpanStubs, wantSI []traceSpanInfo) tracetest.SpanStubs {
+	out := make(tracetest.SpanStubs, len(wantSI))
+	used := make([]bool, len(spans))
+	for i, want := range wantSI {
+		for j, s := range spans {
+			if used[j] {
+				continue
+			}
+			if s.Name == want.name && s.SpanKind.String() == want.spanKind {
+				out[i] = s
+				used[j] = true
+				break
+			}
+		}
+	}
+	return out
+}
+
 // defaultMetricsOptions creates default metrics options
 func defaultMetricsOptions(_ *testing.T, methodAttributeFilter func(string) bool) (*opentelemetry.MetricsOptions, *metric.ManualReader) {
 	reader := metric.NewManualReader()
@@ -857,6 +880,8 @@ func (s) TestMetricsAndTracesOptionEnabled(t *testing.T) {
 		},
 	}
 
+	spans = reorderSpansToMatchWantSI(spans, wantSI)
+
 	// Check that same traceID is used in client and server for unary RPC call.
 	if got, want := spans[0].SpanContext.TraceID(), spans[2].SpanContext.TraceID(); got != want {
 		t.Fatal("TraceID mismatch in client span and server span.")
@@ -1141,6 +1166,8 @@ func (s) TestSpan(t *testing.T) {
 			events: []trace.Event{},
 		},
 	}
+
+	spans = reorderSpansToMatchWantSI(spans, wantSI)
 
 	// Check that same traceID is used in client and server for unary RPC call.
 	if got, want := spans[0].SpanContext.TraceID(), spans[2].SpanContext.TraceID(); got != want {
@@ -1427,6 +1454,8 @@ func (s) TestSpan_WithW3CContextPropagator(t *testing.T) {
 			events: []trace.Event{},
 		},
 	}
+
+	spans = reorderSpansToMatchWantSI(spans, wantSI)
 
 	// Check that same traceID is used in client and server.
 	if got, want := spans[0].SpanContext.TraceID(), spans[2].SpanContext.TraceID(); got != want {
